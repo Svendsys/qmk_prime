@@ -176,28 +176,30 @@ loses the state of two electrical rows, which are the bottom physical row.
 from columns 1 and 7 (QMK issue #12308). Not subtle — you would notice
 immediately.
 
-**Which to use.** `rev3_drop` is the one built for Drop-purchased boards, and
-this board is branded OLKB + Massdrop. But the branding alone does not settle
-it: every Preonic rev3 was sold through Massdrop, and the split addresses a
-variance that affected *some* of that run, not all of it.
+**Which to use: `rev3_drop`, confirmed from the board itself.** The regulatory
+label on the back plate reads:
 
-The cheaper evidence is the firmware already on the board, which has worked for
-years. The manufacturer string is the only USB field that differs between the
-two targets, so it names the revision the working firmware was built from:
+```
+Preonic Mechanical Keyboard
+Model: OLKB-60-3
+Massdrop Inc.
+Manufactured in China          FCC  CE          R01
+```
+
+**Massdrop Inc.** is the named manufacturer and FCC-responsible party — not
+OLKB. This unit came off Drop's production run, which is precisely the
+population PR #14488 added `rev3_drop` for. The case engraving reads
+`massdrop x olkb`, and `OLKB-60-3` confirms rev3.
+
+(A cross-check, no longer needed but harmless: the USB manufacturer string is
+the only descriptor field that differs between the targets — `rev3` reports
+`OLKB`, `rev3_drop` reports `Drop` — so it names the revision whatever firmware
+is currently flashed was built from.)
 
 ```sh
 lsusb -d 03a8:a649 -v 2>/dev/null | grep -i imanufacturer      # Linux
 system_profiler SPUSBDataType | grep -A8 -i preonic            # macOS
 ```
-
-Reports `OLKB` -> that firmware is a `preonic/rev3` build and this board is
-demonstrably fine on `rev3`. Reports `Drop` -> use `rev3_drop`.
-
-One caveat: `rev3_drop` was only created in late 2021 (it is present in the
-Nov 2021 tree, so it landed shortly before). A build older than the split
-reports `OLKB` regardless, because there was nothing else to be. If the string
-says `OLKB` and the firmware predates the split, the test is inconclusive and
-the branding argument wins — use `rev3_drop`.
 
 Either way this is one flash to test and one flash to undo, with bootmagic and
 the PCB reset button as firmware-independent escapes. Both targets are kept
@@ -205,9 +207,10 @@ building in CI for exactly this reason.
 
 ## Decisions
 
-- **Board is the Drop-manufactured Preonic**, so the build target is
-  `preonic/rev3_drop`, not `preonic/rev3`. Both are kept building in CI in case
-  that turns out to be wrong.
+- **Board is the Drop-manufactured Preonic** — confirmed from the regulatory
+  label, which names Massdrop Inc. as manufacturer. Build target is
+  `preonic/rev3_drop`. `preonic/rev3` is kept building in CI anyway; it costs
+  nothing and keeps the fallback honest.
 - **Verbatim port first**, then the redesign, so any misbehaviour can be
   attributed to one deliberate change rather than to the port.
 - **Keep:** the always-on `_FUNCTION` layer, Colemak/QWERTY switching, per-layer
@@ -257,8 +260,9 @@ Three ways into the bootloader, in order of preference:
 1. **Bootmagic** — hold the top-left key (Esc position) while plugging the board
    in. Enabled at the keyboard level, so it works regardless of the keymap.
 2. **`QK_BOOT`** — hold right Ctrl, then the top-right key.
-3. **The physical reset button** on the underside of the PCB. This one does not
-   depend on the firmware working at all, which is the point.
+3. **The physical reset button.** A pinhole labelled `reset` on the back plate,
+   near the top right — reachable with a paperclip or SIM tool, no disassembly.
+   This depends on no firmware at all, which is the point.
 
 ## Verification
 
