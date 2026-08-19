@@ -48,13 +48,17 @@ jobs:
       # The printed cheatsheet is generated from keymap.c. If someone changes
       # the keymap without regenerating, the sheet by the desk starts lying —
       # which is exactly how the 2021 keymap's ASCII diagrams went stale.
+      # Compared with plain `diff` rather than `git diff`: the checkout inside
+      # this container is not a trusted git repository from the step's point of
+      # view, so git refuses to run. This also prints what actually differs.
       - name: "Cheatsheet is up to date with the keymap"
         run: |
-          cd preonic-cheatsheet
-          python3 make_cheatsheet.py --md
-          cd ..
-          git diff --exit-code -- preonic-cheatsheet/preonic-dooroflife-v2.md \
-            || { echo "::error::preonic-cheatsheet is stale — run make_cheatsheet.py and commit"; exit 1; }
+          cp preonic-cheatsheet/preonic-dooroflife-v2.md "$RUNNER_TEMP/committed.md"
+          python3 preonic-cheatsheet/make_cheatsheet.py --md
+          if ! diff -u "$RUNNER_TEMP/committed.md" preonic-cheatsheet/preonic-dooroflife-v2.md; then
+            echo "::error::preonic-cheatsheet is stale — run preonic-cheatsheet/make_cheatsheet.py and commit the result"
+            exit 1
+          fi
 
   build:
     name: "${{ matrix.keyboard }}:${{ matrix.keymap }}"
@@ -71,13 +75,15 @@ jobs:
         keymap: [dooroflife, dooroflife_v2]
 
     steps:
+      # `submodules: recursive` matches what upstream QMK's own workflows do.
+      # Hand-picking chibios alone silently omits lib/printf, which quantum
+      # falls back to for print.h — the build then dies on a missing header.
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: "Trust the workspace"
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-      - name: "Fetch ChibiOS (required for STM32 targets)"
-        run: git submodule update --init --recursive --depth 1 lib/chibios lib/chibios-contrib
 
       - name: "Compile"
         run: qmk compile -kb ${{ matrix.keyboard }} -km ${{ matrix.keymap }}
