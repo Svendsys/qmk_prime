@@ -151,11 +151,57 @@ git submodule update --init --recursive lib/chibios lib/chibios-contrib
 make preonic/rev3:default
 ```
 
-**Confirm the target before flashing.** QMK now ships two rev3 targets:
-`preonic/rev3` (OLKB) and `preonic/rev3_drop` (Drop-manufactured, declares
-`CUSTOM_MATRIX = yes` and ships its own `matrix.c`). They are not
-interchangeable. The split did not exist in 2021, when a single `preonic/rev3`
-covered both.
+## rev3 vs rev3_drop
+
+QMK ships two rev3 targets. They are electrically identical on paper — same
+matrix pins, same diode direction, same VID/PID (`0x03A8:0xA649`), same RGB and
+encoder config. The differences are:
+
+| | `preonic/rev3` | `preonic/rev3_drop` |
+|---|---|---|
+| Board definition | `QMK_PROTON_C` | default STM32F303 |
+| Matrix | QMK's generic scanning | `CUSTOM_MATRIX = yes` + own `matrix.c` |
+| `halconf.h` | none | enables PWM/GPT/DAC/I2C |
+| USB manufacturer string | `OLKB` | `Drop` |
+
+**Why the split exists.** QMK PR #14488, *"Use old custom matrix for Drop
+Planck+Preonic"*: *"There have been numerous reports of the Drop OLKB boards
+having issues which are fixed by reverting to the old custom matrix."* Drop's
+run was made by a different manufacturer than OLKB's usual supplier, and the
+generic matrix code misreads it. The old custom matrix reads whole *columns*
+into `matrix_col_t` and transposes them during debouncing; the generic path
+loses the state of two electrical rows, which are the bottom physical row.
+
+**Symptom of the wrong target:** stuck keys, and constant spurious keycodes
+from columns 1 and 7 (QMK issue #12308). Not subtle — you would notice
+immediately.
+
+**Which to use.** `rev3_drop` is the one built for Drop-purchased boards, and
+this board is branded OLKB + Massdrop. But the branding alone does not settle
+it: every Preonic rev3 was sold through Massdrop, and the split addresses a
+variance that affected *some* of that run, not all of it.
+
+The cheaper evidence is the firmware already on the board, which has worked for
+years. The manufacturer string is the only USB field that differs between the
+two targets, so it names the revision the working firmware was built from:
+
+```sh
+lsusb -d 03a8:a649 -v 2>/dev/null | grep -i imanufacturer      # Linux
+system_profiler SPUSBDataType | grep -A8 -i preonic            # macOS
+```
+
+Reports `OLKB` -> that firmware is a `preonic/rev3` build and this board is
+demonstrably fine on `rev3`. Reports `Drop` -> use `rev3_drop`.
+
+One caveat: `rev3_drop` was only created in late 2021 (it is present in the
+Nov 2021 tree, so it landed shortly before). A build older than the split
+reports `OLKB` regardless, because there was nothing else to be. If the string
+says `OLKB` and the firmware predates the split, the test is inconclusive and
+the branding argument wins — use `rev3_drop`.
+
+Either way this is one flash to test and one flash to undo, with bootmagic and
+the PCB reset button as firmware-independent escapes. Both targets are kept
+building in CI for exactly this reason.
 
 ## Decisions
 
