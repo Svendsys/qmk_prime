@@ -18,10 +18,12 @@ on:
   push:
     paths:
       - 'keyboards/preonic/**'
+      - 'preonic-cheatsheet/**'
       - '.github/workflows/build_preonic.yml'
   pull_request:
     paths:
       - 'keyboards/preonic/**'
+      - 'preonic-cheatsheet/**'
   workflow_dispatch:
 
 concurrency:
@@ -42,6 +44,17 @@ jobs:
       # to nothing at all, and the board silently loses that key.
       - name: "dooroflife_v2: _FUNCTION covers every key position"
         run: python3 keyboards/preonic/keymaps/dooroflife_v2/verify_coverage.py
+
+      # The printed cheatsheet is generated from keymap.c. If someone changes
+      # the keymap without regenerating, the sheet by the desk starts lying —
+      # which is exactly how the 2021 keymap's ASCII diagrams went stale.
+      - name: "Cheatsheet is up to date with the keymap"
+        run: |
+          cd preonic-cheatsheet
+          python3 make_cheatsheet.py --md
+          cd ..
+          git diff --exit-code -- preonic-cheatsheet/preonic-dooroflife-v2.md \
+            || { echo "::error::preonic-cheatsheet is stale — run make_cheatsheet.py and commit"; exit 1; }
 
   build:
     name: "${{ matrix.keyboard }}:${{ matrix.keymap }}"
