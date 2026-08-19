@@ -1,0 +1,80 @@
+# Builds the personal Preonic keymaps on every push that touches them.
+#
+# This exists because the 2021 attempt at this keymap was committed in a state
+# that could not compile, and nobody found out until flashing time. A red tick
+# here is cheap; a keyboard that does not work is not.
+#
+# Most upstream QMK workflows in this directory are gated on
+# `github.repository == 'qmk/qmk_firmware'` and stay quiet on this fork. The
+# few that are not — cli.yml and unit_test.yml — only fire on pushes to
+# master or develop, so neither collides with work on a feature branch.
+
+name: Build Preonic keymaps
+
+permissions:
+  contents: read
+
+on:
+  push:
+    paths:
+      - 'keyboards/preonic/**'
+      - '.github/workflows/build_preonic.yml'
+  pull_request:
+    paths:
+      - 'keyboards/preonic/**'
+  workflow_dispatch:
+
+concurrency:
+  group: build-preonic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: "Verify keymap structure"
+    runs-on: ubuntu-latest
+    container: ghcr.io/qmk/qmk_cli
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Catches the failure mode this architecture is prone to: a key position
+      # that is KC_NO on the base layer and transparent on _FUNCTION resolves
+      # to nothing at all, and the board silently loses that key.
+      - name: "dooroflife_v2: _FUNCTION covers every key position"
+        run: python3 keyboards/preonic/keymaps/dooroflife_v2/verify_coverage.py
+
+  build:
+    name: "${{ matrix.keyboard }}:${{ matrix.keymap }}"
+    runs-on: ubuntu-latest
+    container: ghcr.io/qmk/qmk_cli
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both revisions: rev3_drop is the Drop-manufactured board and uses a
+        # custom matrix scanner, rev3 is the OLKB one. They are not
+        # interchangeable, so neither is allowed to break.
+        keyboard: [preonic/rev3, preonic/rev3_drop]
+        keymap: [dooroflife, dooroflife_v2]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Trust the workspace"
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: "Fetch ChibiOS (required for STM32 targets)"
+        run: git submodule update --init --recursive --depth 1 lib/chibios lib/chibios-contrib
+
+      - name: "Compile"
+        run: qmk compile -kb ${{ matrix.keyboard }} -km ${{ matrix.keymap }}
+
+      - name: "Upload firmware"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.keymap }}-${{ github.job }}-${{ strategy.job-index }}
+          path: |
+            *.bin
+            *.hex
+          if-no-files-found: error
+          retention-days: 30
