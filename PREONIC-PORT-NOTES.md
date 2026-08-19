@@ -157,23 +157,83 @@ make preonic/rev3:default
 interchangeable. The split did not exist in 2021, when a single `preonic/rev3`
 covered both.
 
-## Plan
+## Decisions
 
-1. **Establish the escape hatch.** Confirm hardware DFU entry (PCB reset button,
-   or hold top-left key while plugging in). Set `BOOTMAGIC_ENABLE = yes`. Put
-   `QK_BOOT` on a real key, not only a combo. Keep a known-good binary to roll
-   back to.
-2. **Port the working layout verbatim.** Commit 1's eight layers with only the
-   mechanical renames applied — no design changes. Build, flash, use for a day.
-   This is the trustworthy baseline.
-3. **Rebuild the rewrite correctly.** Fix all five build errors; rewrite the
-   layer hook to fold state into its return value; gate macros on
-   `record->event.pressed`; restore `SC_SENT` and the RGB keys; enable dynamic
-   macros; decide whether `_GAME` earns its place.
-4. **Introduce it in slices.** Always-on `_FUNCTION` first and alone (riskiest,
-   worst failure mode), then combos, dynamic macros, text macros, per-layer RGB.
-   One commit each, so a bad slice is one `git revert` away.
-5. **Make it hard to break again.** GitHub Actions workflow building the keymap
-   on every push, so a syntax error can never sit unnoticed in a commit again.
-   Keep the keymap as C — combos, macros and layer logic cannot be expressed in
-   the Configurator, which is exactly why the Configurator was outgrown.
+- **Board is the Drop-manufactured Preonic**, so the build target is
+  `preonic/rev3_drop`, not `preonic/rev3`. Both are kept building in CI in case
+  that turns out to be wrong.
+- **Verbatim port first**, then the redesign, so any misbehaviour can be
+  attributed to one deliberate change rather than to the port.
+- **Keep:** the always-on `_FUNCTION` layer, Colemak/QWERTY switching, per-layer
+  underglow.
+- **Drop:** combos, dynamic macros, text-editing macros.
+- **Mode indication is a first-class requirement**, not a nicety. Two signals:
+  underglow colour for *where you are*, a per-layout tune for *something just
+  changed*.
+
+## What is on this branch
+
+| Keymap | What it is |
+|--------|-----------|
+| `dooroflife` | The layout in daily use since 2021, renames only. Proven identical by `verify_verbatim.py` — all 8 layers x 59 positions. |
+| `dooroflife_v2` | The redesign: always-on `_FUNCTION`, Colemak/QWERTY switching, per-layer underglow. Guarded by `verify_coverage.py`. |
+
+Both build clean on `preonic/rev3_drop` and `preonic/rev3`, and both are built
+in CI on every push by `.github/workflows/build_preonic.yml`.
+
+### How v2 differs from what you use today
+
+At rest, `dooroflife_v2` in Colemak is identical to the current layout at 58 of
+59 key positions. The single difference: the top-left key keeps its `KC_F7` tap
+but no longer reaches the vestigial second numpad. The settings layer stays on
+right Ctrl, where it has been since 2021.
+
+New in v2:
+
+- `BASE_CM` / `BASE_QW` / `BASE_TG` on the settings-layer home row (hold right
+  Ctrl, then `A` / `R` / `S` in Colemak) set Colemak, toggle, or set QWERTY.
+  The choice persists to EEPROM, so it survives unplugging.
+- Underglow at rest shows the base layout — cyan for Colemak, amber for QWERTY.
+  Holding a layer key shows that layer's colour instead.
+- Switching layout plays that layout's tune.
+- Underglow colouring stands down entirely while the lighting is off or running
+  an animation, and preserves the brightness set with `UG_VALU`/`UG_VALD`.
+
+## Flashing
+
+```sh
+make preonic/rev3_drop:dooroflife          # or :dooroflife_v2
+make preonic/rev3_drop:dooroflife:flash    # build and flash in one step
+```
+
+Three ways into the bootloader, in order of preference:
+
+1. **Bootmagic** — hold the top-left key (Esc position) while plugging the board
+   in. Enabled at the keyboard level, so it works regardless of the keymap.
+2. **`QK_BOOT`** — hold right Ctrl, then the top-right key.
+3. **The physical reset button** on the underside of the PCB. This one does not
+   depend on the firmware working at all, which is the point.
+
+## Verification
+
+```sh
+# prove the verbatim port still matches the 2021 Configurator layout
+python3 keyboards/preonic/keymaps/dooroflife/verify_verbatim.py ../qmk_preonic
+
+# prove _FUNCTION leaves no dead keys and no momentary layer is unreachable
+python3 keyboards/preonic/keymaps/dooroflife_v2/verify_coverage.py
+```
+
+## Remaining
+
+1. **Flash `dooroflife` and use it for a day.** This is the checkpoint that
+   matters: if it feels different from what is on the board now, the port is
+   wrong and that must be resolved before building on it.
+2. **Then flash `dooroflife_v2`.** Confirm the always-on `_FUNCTION` layer holds
+   — every key working, not just the letters — and that the underglow tracks the
+   mode clearly enough to be useful.
+3. **Tune from there.** Whether `_FKEYS2`/`_NUMPAD2` are genuinely unused, and
+   whether the QWERTY layer's displaced `P` matters in practice.
+
+Deliberately not done, per the decisions above: combos, dynamic macros, the
+text-editing macros, and the `_GAME` layer.
