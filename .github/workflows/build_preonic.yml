@@ -1,0 +1,109 @@
+# Builds the personal Preonic keymaps on every push that touches them.
+#
+# This exists because the 2021 attempt at this keymap was committed in a state
+# that could not compile, and nobody found out until flashing time. A red tick
+# here is cheap; a keyboard that does not work is not.
+#
+# Most upstream QMK workflows in this directory are gated on
+# `github.repository == 'qmk/qmk_firmware'` and stay quiet on this fork. The
+# few that are not — cli.yml and unit_test.yml — only fire on pushes to
+# master or develop, so neither collides with work on a feature branch.
+
+name: Build Preonic keymaps
+
+permissions:
+  contents: read
+
+on:
+  push:
+    paths:
+      - 'keyboards/preonic/**'
+      - 'preonic-cheatsheet/**'
+      - '.github/workflows/build_preonic.yml'
+  pull_request:
+    paths:
+      - 'keyboards/preonic/**'
+      - 'preonic-cheatsheet/**'
+  workflow_dispatch:
+
+concurrency:
+  group: build-preonic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: "Verify keymap structure"
+    runs-on: ubuntu-latest
+    container: ghcr.io/qmk/qmk_cli
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Catches the failure mode this architecture is prone to: a key position
+      # that is KC_NO on the base layer and transparent on _FUNCTION resolves
+      # to nothing at all, and the board silently loses that key.
+      - name: "dooroflife_v2: _FUNCTION covers every key position"
+        run: python3 keyboards/preonic/keymaps/dooroflife_v2/verify_coverage.py
+
+      # The printed cheatsheet is generated from keymap.c. If someone changes
+      # the keymap without regenerating, the sheet by the desk starts lying —
+      # which is exactly how the 2021 keymap's ASCII diagrams went stale.
+      # Compared with plain `diff` rather than `git diff`: the checkout inside
+      # this container is not a trusted git repository from the step's point of
+      # view, so git refuses to run. This also prints what actually differs.
+      - name: "Cheatsheet is up to date with the keymap"
+        run: |
+          cp preonic-cheatsheet/preonic-dooroflife-v2.md "$RUNNER_TEMP/committed.md"
+          python3 preonic-cheatsheet/make_cheatsheet.py --md
+          if ! diff -u "$RUNNER_TEMP/committed.md" preonic-cheatsheet/preonic-dooroflife-v2.md; then
+            echo "::error::preonic-cheatsheet is stale — run preonic-cheatsheet/make_cheatsheet.py and commit the result"
+            exit 1
+          fi
+
+  build:
+    name: "${{ matrix.keyboard }}:${{ matrix.keymap }}"
+    runs-on: ubuntu-latest
+    container: ghcr.io/qmk/qmk_cli
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both revisions: rev3_drop is the Drop-manufactured board and uses a
+        # custom matrix scanner, rev3 is the OLKB one. They are not
+        # interchangeable, so neither is allowed to break.
+        keyboard: [preonic/rev3, preonic/rev3_drop]
+        keymap: [dooroflife, dooroflife_v2]
+        # `rev` carries the revision into the artifact name; matrix.keyboard
+        # cannot be used verbatim there because artifact names reject "/".
+        include:
+          - keyboard: preonic/rev3
+            rev: rev3
+          - keyboard: preonic/rev3_drop
+            rev: rev3_drop
+
+    steps:
+      # `submodules: recursive` matches what upstream QMK's own workflows do.
+      # Hand-picking chibios alone silently omits lib/printf, which quantum
+      # falls back to for print.h — the build then dies on a missing header.
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: "Trust the workspace"
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: "Compile"
+        run: qmk compile -kb ${{ matrix.keyboard }} -km ${{ matrix.keymap }}
+
+      - name: "Upload firmware"
+        uses: actions/upload-artifact@v4
+        with:
+          # Named for what it is: flashing rev3 firmware to a rev3_drop board
+          # gives stuck keys and spurious output from columns 1 and 7, so the
+          # download must say which revision it is.
+          name: ${{ matrix.keymap }}-${{ matrix.rev }}
+          path: |
+            *.bin
+            *.hex
+          if-no-files-found: error
+          retention-days: 30

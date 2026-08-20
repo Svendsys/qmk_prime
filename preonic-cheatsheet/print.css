@@ -1,0 +1,300 @@
+/* Preonic cheatsheet — A4, black and white laser.
+ *
+ * Everything is encoded as fill level, border weight and position, never
+ * colour, so nothing is lost on a monochrome printer. Fills are kept at or
+ * above 8% grey, which halftones cleanly on a 600dpi laser; anything lighter
+ * tends to disappear.
+ */
+
+@page {
+  size: A4;
+  margin: 13mm 12mm 12mm;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+body {
+  font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
+  font-size: 9.2pt;
+  line-height: 1.45;
+  color: #000;
+  background: #fff;
+  margin: 0;
+}
+
+/* ── headings ─────────────────────────────────────────────────────────── */
+
+h1 {
+  font-size: 21pt;
+  line-height: 1.05;
+  letter-spacing: -0.4pt;
+  margin: 0 0 1.5mm;
+  font-weight: 700;
+}
+
+h2 {
+  font-size: 12.5pt;
+  line-height: 1.15;
+  margin: 7mm 0 1.5mm;
+  padding-top: 2mm;
+  border-top: 1pt solid #000;
+  font-weight: 700;
+  break-after: avoid;
+  break-inside: avoid;
+}
+
+h3 {
+  font-size: 9.8pt;
+  margin: 4mm 0 1.2mm;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6pt;
+  break-after: avoid;
+}
+
+h1 + p, h2 + p, h3 + p { margin-top: 0; }
+
+p { margin: 0 0 2mm; }
+
+.titleblock {
+  border: 1.6pt solid #000;
+  padding: 4mm 5mm 3.5mm;
+  margin-bottom: 6mm;
+}
+.titleblock h1 { margin-bottom: 1mm; }
+.titleblock p {
+  margin: 0;
+  font-size: 8.2pt;
+  letter-spacing: 0.2pt;
+}
+
+/* ── the keyboard ─────────────────────────────────────────────────────── */
+
+table.kb {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0.7mm;
+  margin: 2.5mm 0 3mm;
+  break-inside: avoid;
+}
+
+table.kb td {
+  height: 12.5mm;
+  padding: 0;
+  border: 0.5pt solid #000;
+  text-align: center;
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+/* the tap legend */
+table.kb td > span {
+  display: block;
+  font-size: 7.4pt;
+  line-height: 1.1;
+  padding: 0 0.4mm;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+/* the hold legend — a bar across the top of the cap */
+table.kb td > b {
+  display: block;
+  font-size: 4.9pt;
+  line-height: 1;
+  letter-spacing: 0.25pt;
+  padding: 0.9mm 0 0.8mm;
+  margin-bottom: 0.6mm;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+table.kb.small td { height: 9.5mm; }
+table.kb.small td > span { font-size: 6.6pt; }
+table.kb.small td > b { font-size: 4.5pt; padding: 0.7mm 0 0.6mm; }
+
+/* ── key kinds ────────────────────────────────────────────────────────── */
+
+/* plain key on this layer */
+td.key { background: #fff; }
+
+/* nothing on this layer — supplied by whatever sits below or above */
+td.off,
+td.thru {
+  background: #fff;
+  border: 0.4pt dotted #9a9a9a;
+}
+td.off  > span::after,
+td.thru > span::after {
+  content: "·";
+  color: #9a9a9a;
+  font-size: 9pt;
+}
+
+/* layer key: solid black bar naming the layer it reaches */
+td.lt { background: #fff; border-width: 1.1pt; }
+td.lt > b { background: #000; color: #fff; }
+
+/* dual-role modifier: same shape, lighter bar, so it reads as a relative */
+td.mt { background: #fff; border-width: 1.1pt; }
+td.mt > b {
+  background: #d2d2d2;
+  color: #000;
+  border-bottom: 0.4pt solid #000;
+}
+
+/* keys you actively reach for */
+td.strong {
+  background: #fff;
+  border-width: 1.3pt;
+}
+table.kb td.strong > span { font-weight: 700; }
+
+/* destructive keys — double rule, impossible to mistake for a normal cap */
+td.danger {
+  background: #fff;
+  border: 1.1pt double #000;
+  outline: 0.4pt solid #000;
+  outline-offset: -1.9pt;
+}
+/* `table.kb` prefix is load-bearing: `table.kb td > span` above is more
+ * specific than a bare `td.danger > span`, and would win on font-size. */
+table.kb td.danger > span {
+  font-weight: 700;
+  font-size: 5.0pt;
+  letter-spacing: -0.1pt;
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: none;
+}
+
+/* composed view: which layer each cap came from */
+td.from-base { background: #fff; }
+td.from-fn   { background: #e6e6e6; }
+td.from-fn.lt, td.from-fn.mt { background: #fff; }
+
+/* ── legend ───────────────────────────────────────────────────────────── */
+
+table.legend { margin: 1.5mm 0 0; break-inside: avoid; }
+table.legend td {
+  border: 0;
+  padding: 0.9mm 2mm 0.9mm 0;
+  font-size: 8.2pt;
+  vertical-align: top;
+}
+table.legend tr > td:first-child { width: 14mm; }
+
+.sw {
+  display: inline-block;
+  width: 11mm;
+  height: 5.5mm;
+  vertical-align: -1.4mm;
+  border: 0.5pt solid #000;
+  background: #fff;
+}
+.sw.from-base { background: #fff; }
+.sw.from-fn   { background: #e6e6e6; }
+.sw.lt {
+  border-width: 1.1pt;
+  background:
+    linear-gradient(#000 0 2mm, #fff 2mm 100%);
+}
+.sw.mt {
+  border-width: 1.1pt;
+  background:
+    linear-gradient(#d2d2d2 0 2mm, #fff 2mm 100%);
+}
+
+/* ── prose tables ─────────────────────────────────────────────────────── */
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 2mm 0 3mm;
+  font-size: 8.6pt;
+  break-inside: avoid;
+}
+
+th, td { text-align: left; }
+
+table:not(.kb) th {
+  border-bottom: 1pt solid #000;
+  padding: 1.2mm 3mm 1.2mm 0;
+  font-size: 7.4pt;
+  text-transform: uppercase;
+  letter-spacing: 0.6pt;
+  font-weight: 700;
+}
+
+table:not(.kb) td {
+  border-bottom: 0.4pt solid #c4c4c4;
+  padding: 1.1mm 3mm 1.1mm 0;
+  vertical-align: top;
+}
+
+table:not(.kb) tr:last-child td { border-bottom: 0; }
+
+/* long reference lists set as two columns side by side */
+.sbs {
+  display: flex;
+  gap: 8mm;
+  break-inside: avoid;
+}
+.sbs > table { flex: 1; margin-top: 0; }
+
+/* ── notes ────────────────────────────────────────────────────────────── */
+
+blockquote {
+  margin: 2.5mm 0;
+  padding: 1.6mm 0 1.6mm 4mm;
+  border-left: 1.6pt solid #000;
+  font-size: 8.4pt;
+  break-inside: avoid;
+}
+blockquote p { margin: 0; }
+blockquote p + p { margin-top: 1.5mm; }
+
+ol, ul { margin: 0 0 3mm; padding-left: 5mm; }
+li { margin-bottom: 1.2mm; }
+
+code {
+  font-family: "DejaVu Sans Mono", "Liberation Mono", monospace;
+  font-size: 8pt;
+  background: #efefef;
+  padding: 0.2mm 0.8mm;
+  border-radius: 0.6mm;
+}
+
+pre {
+  background: #f2f2f2;
+  border-left: 1.6pt solid #000;
+  padding: 2.5mm 3mm;
+  margin: 2.5mm 0;
+  font-size: 8pt;
+  overflow: hidden;
+  break-inside: avoid;
+}
+pre code { background: none; padding: 0; font-size: 8pt; }
+
+strong { font-weight: 700; }
+
+.colophon {
+  margin-top: 6mm;
+  padding-top: 2mm;
+  border-top: 0.5pt solid #000;
+  font-size: 7.2pt;
+  color: #444;
+}
+.colophon p { margin: 0; }
+
+/* ── pagination ───────────────────────────────────────────────────────── */
+
+.pagebreak { break-after: page; height: 0; }

@@ -1,0 +1,4 @@
+# Upstream QMK's root .gitignore has a blanket `*.pdf` rule, which silently
+# kept the printable cheatsheet out of the repo. The PDF is a deliverable
+# here, not a build artifact, so re-include it for this directory only.
+!*.pdf
