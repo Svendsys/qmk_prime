@@ -102,9 +102,9 @@ NUMPAD = {"KC_P0", "KC_P1", "KC_P2", "KC_P3", "KC_P4", "KC_P5", "KC_P6",
 # Underglow hue constant -> how to describe the colour in words, since the
 # sheet is printed in black and white.
 HUE_NAMES = {
-    "HUE_COLEMAK":  "Cyan",
+    "HUE_COLEMAK":  "Teal",
     "HUE_QWERTY":   "Amber",
-    "HUE_FKEYS":    "Pink",
+    "HUE_FKEYS":    "Magenta",
     "HUE_NAV":      "Violet",
     "HUE_MOUSE":    "Green",
     "HUE_MEDIA":    "Red",

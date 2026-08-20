@@ -73,6 +73,13 @@ jobs:
         # interchangeable, so neither is allowed to break.
         keyboard: [preonic/rev3, preonic/rev3_drop]
         keymap: [dooroflife, dooroflife_v2]
+        # `rev` carries the revision into the artifact name; matrix.keyboard
+        # cannot be used verbatim there because artifact names reject "/".
+        include:
+          - keyboard: preonic/rev3
+            rev: rev3
+          - keyboard: preonic/rev3_drop
+            rev: rev3_drop
 
     steps:
       # `submodules: recursive` matches what upstream QMK's own workflows do.
@@ -91,7 +98,10 @@ jobs:
       - name: "Upload firmware"
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.keymap }}-${{ github.job }}-${{ strategy.job-index }}
+          # Named for what it is: flashing rev3 firmware to a rev3_drop board
+          # gives stuck keys and spurious output from columns 1 and 7, so the
+          # download must say which revision it is.
+          name: ${{ matrix.keymap }}-${{ matrix.rev }}
           path: |
             *.bin
             *.hex

@@ -80,6 +80,31 @@ if below:
 else:
     print(f"   every momentary layer sits above _FUNCTION")
 
+# _FUNCTION only supplies those keys if something actually switches it on at
+# boot. Folding it into layer_state_set_user()'s return value is NOT enough:
+# quantum_init() calls layer_state_set_kb(layer_state) and throws the result
+# away (quantum/keyboard.c), and layer_state is only ever written inside
+# layer_state_set() (quantum/action_layer.c). With layer_state starting at 0
+# in .bss, nothing calls that at boot — so the layer never comes on, the board
+# types alphas and nothing else, and because every layer key lives on
+# _FUNCTION there is no way to reach any other layer. That is the exact 2021
+# failure this keymap exists to fix, and the composition check above cannot
+# see it, because it assumes the composition it is meant to be proving.
+post_init = re.search(r'void\s+keyboard_post_init_user\s*\([^)]*\)\s*\{(.*?)\n\}',
+                      strip_comments(SRC), re.S)
+print()
+if not post_init:
+    fail = 1
+    print("!! no keyboard_post_init_user() — nothing can switch _FUNCTION on at boot")
+elif not re.search(r'layer_on\s*\(\s*_FUNCTION\s*\)', post_init.group(1)):
+    fail = 1
+    print("!! keyboard_post_init_user() never calls layer_on(_FUNCTION):")
+    print("   _FUNCTION is never enabled at boot, so the board types alphas only")
+    print("   and no layer key works. Folding it into layer_state_set_user()'s")
+    print("   return value does not run at boot — see the comment above.")
+else:
+    print("   _FUNCTION is switched on at boot by keyboard_post_init_user()")
+
 print()
 print("COVERAGE OK" if not fail else "COVERAGE FAILED")
 sys.exit(fail)

@@ -108,10 +108,12 @@ legend when tapped; hold it past **180 ms** and it switches layer instead.
 
 ## Swapping Colemak and QWERTY
 
-Hold **right Ctrl**, then press **A** for Colemak, **R** to swap, or **S**
-for QWERTY — the three heavy-bordered keys on the Settings layer. The board
-plays that layout's own tune so you know it took, and remembers the choice
-across unplugging.
+Hold **right Ctrl**, then press the key marked **COLEMAK**, **SWAP** or
+**QWERTY** on the Settings layer. Those are the same three physical keys
+whichever layout you are in, but they carry different letters —
+**A / R / S** in Colemak, **A / S / D**
+in QWERTY. The board plays that layout's own tune so you know it took, and
+remembers the choice across unplugging.
 
 <div class="pagebreak"></div>
 
@@ -681,7 +683,7 @@ Hold right Ctrl. Layout switching, lighting, sound, and the bootloader.
 <td class="off"><span>&nbsp;</span></td>
 <td class="off"><span>&nbsp;</span></td>
 <td class="off"><span>&nbsp;</span></td>
-<td class="danger"><span>Wipe settings</span></td>
+<td class="off"><span>&nbsp;</span></td>
 <td class="danger"><span>BOOTLOADER</span></td>
 </tr>
 <tr>
@@ -727,7 +729,7 @@ Hold right Ctrl. Layout switching, lighting, sound, and the bootloader.
 <td class="off"><span>&nbsp;</span></td>
 </tr>
 <tr>
-<td class="off"><span>&nbsp;</span></td>
+<td class="danger"><span>Wipe settings</span></td>
 <td class="off"><span>&nbsp;</span></td>
 <td class="off"><span>&nbsp;</span></td>
 <td class="off"><span>&nbsp;</span></td>
@@ -743,8 +745,9 @@ Hold right Ctrl. Layout switching, lighting, sound, and the bootloader.
 
 ## Every dual-role key
 
-Tap is under **180 ms**. Press another key while holding and it commits
-to the hold immediately, so fast typing does not produce stray letters.
+Tap is under **180 ms**. For the layer and Alt keys, pressing another
+key while holding commits to the hold immediately, so fast typing does not
+produce stray letters.
 
 <div class="sbs"><table>
 <thead><tr><th>Tap for</th><th>Hold for</th></tr></thead>
@@ -762,6 +765,13 @@ to the hold immediately, so fast typing does not produce stray letters.
 <tr><td><b>R-Ctrl</b></td><td>SETTINGS</td></tr>
 </tbody></table></div>
 
+> **Enter/Shift is the exception.** It is a Space Cadet key, not a
+> mod-tap, so it ignores that rule: it sends Enter on release whenever
+> it was held for less than 180 ms, even if you pressed something else
+> in between. Typing a fast capital with the right pinky can therefore
+> produce a stray Enter. This matches the 2021 board, which used the
+> same key — it is inherited behaviour, not new.
+
 ## Knowing which mode you are in
 
 Two signals, answering two different questions.
@@ -771,9 +781,9 @@ while a layer key is held it shows that layer.
 
 | Underglow | Means |
 |---|---|
-| **Cyan** | Colemak — at rest |
+| **Teal** | Colemak — at rest |
 | **Amber** | QWERTY — at rest |
-| Pink | F-keys — while held |
+| Magenta | F-keys — while held |
 | Violet | Navigation — while held |
 | Green | Mouse — while held |
 | Red | Media — while held |

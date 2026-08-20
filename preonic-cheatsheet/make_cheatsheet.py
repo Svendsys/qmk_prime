@@ -205,6 +205,21 @@ def compose(base, fn):
     return keys, origins
 
 
+def swap_keys(layers, defines):
+    """Where BASE_CM/BASE_TG/BASE_QW sit, named in BOTH letter layouts.
+
+    The same three physical keys read A/R/S in Colemak but A/S/D in QWERTY, so
+    a sheet that names only one of them is wrong exactly when you need it: you
+    are in QWERTY and want back.
+    """
+    out = {}
+    for i, code in enumerate(layers["_SETTINGS"]):
+        e = expand(code, defines)
+        if e in ("BASE_CM", "BASE_TG", "BASE_QW"):
+            out[e] = (label(layers["_COLEMAK"][i]), label(layers["_QWERTY"][i]))
+    return out
+
+
 def html_table(headers, rows, cls=""):
     attr = f' class="{cls}"' if cls else ""
     out = [f"<table{attr}>"]
@@ -319,10 +334,14 @@ def build_markdown():
     A("")
     A("## Swapping Colemak and QWERTY")
     A("")
-    A("Hold **right Ctrl**, then press **A** for Colemak, **R** to swap, or **S**")
-    A("for QWERTY — the three heavy-bordered keys on the Settings layer. The board")
-    A("plays that layout's own tune so you know it took, and remembers the choice")
-    A("across unplugging.")
+    sw = swap_keys(layers, defines)
+    cm, tg, qw = sw["BASE_CM"], sw["BASE_TG"], sw["BASE_QW"]
+    A("Hold **right Ctrl**, then press the key marked **COLEMAK**, **SWAP** or")
+    A("**QWERTY** on the Settings layer. Those are the same three physical keys")
+    A("whichever layout you are in, but they carry different letters —")
+    A(f"**{cm[0]} / {tg[0]} / {qw[0]}** in Colemak, **{cm[1]} / {tg[1]} / {qw[1]}**")
+    A("in QWERTY. The board plays that layout's own tune so you know it took, and")
+    A("remembers the choice across unplugging.")
     A("")
     A('<div class="pagebreak"></div>')
     A("")
@@ -374,11 +393,20 @@ def build_markdown():
     # ── reference ────────────────────────────────────────────────────
     A("## Every dual-role key")
     A("")
-    A(f"Tap is under **{term} ms**. Press another key while holding and it commits")
-    A("to the hold immediately, so fast typing does not produce stray letters.")
+    A(f"Tap is under **{term} ms**. For the layer and Alt keys, pressing another")
+    A("key while holding commits to the hold immediately, so fast typing does not")
+    A("produce stray letters.")
     A("")
     A(dual_role_table(layers, defines))
     A("")
+    if any("SC_SENT" in keys for keys in layers.values()):
+        A("> **Enter/Shift is the exception.** It is a Space Cadet key, not a")
+        A("> mod-tap, so it ignores that rule: it sends Enter on release whenever")
+        A(f"> it was held for less than {term} ms, even if you pressed something else")
+        A("> in between. Typing a fast capital with the right pinky can therefore")
+        A("> produce a stray Enter. This matches the 2021 board, which used the")
+        A("> same key — it is inherited behaviour, not new.")
+        A("")
     A("## Knowing which mode you are in")
     A("")
     A("Two signals, answering two different questions.")
@@ -467,10 +495,11 @@ def write_pdf():
     finally:
         os.remove(tmp)
 
-    size = os.path.getsize(PDF_OUT)
-    pages = open(PDF_OUT, "rb").read().count(b"/Type /Page\n") or \
-        open(PDF_OUT, "rb").read().count(b"/Type /Page")
-    print(f"wrote {os.path.relpath(PDF_OUT, REPO)} ({size:,} bytes, ~{pages} pages)")
+    with open(PDF_OUT, "rb") as f:
+        blob = f.read()
+    # "/Type /Page" also matches "/Type /Pages", the page-tree root, so subtract it.
+    pages = blob.count(b"/Type /Page") - blob.count(b"/Type /Pages")
+    print(f"wrote {os.path.relpath(PDF_OUT, REPO)} ({len(blob):,} bytes, {pages} pages)")
 
 
 if __name__ == "__main__":
@@ -480,7 +509,10 @@ if __name__ == "__main__":
     ap.add_argument("--pdf", action="store_true", help="render the PDF only")
     args = ap.parse_args()
 
-    if not args.pdf:
+    # Passing both flags used to cancel them out and silently write nothing.
+    do_md = args.md or not args.pdf
+    do_pdf = args.pdf or not args.md
+    if do_md:
         write_md()
-    if not args.md:
+    if do_pdf:
         write_pdf()

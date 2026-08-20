@@ -76,6 +76,37 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 This bug survives fixing every syntax error. Getting it to compile was never
 going to be enough.
 
+### ...and folding it into the return value is only half the fix
+
+Returning the layer in `state` is necessary but **not sufficient**, which an
+adversarial review caught after the first version of `dooroflife_v2` was
+already pushed. At boot nothing calls `layer_state_set()` at all:
+
+- `quantum_init()` calls `layer_state_set_kb(layer_state)` and **discards the
+  result** (`quantum/keyboard.c:451`).
+- `layer_state` is only ever assigned inside `layer_state_set()`
+  (`quantum/action_layer.c:138`), and it starts at 0 in `.bss`.
+
+So `layer_state_set_user()` never runs before the first key press, `_FUNCTION`
+is off when the board enumerates, and — since every layer key lives on
+`_FUNCTION` — there is no first key press that could switch it on. The board
+types alphas and nothing else: the exact 2021 symptom, reproduced by the code
+written to fix it. Confirmed in the linked ELF, where `quantum_init` tail-calls
+`layer_state_set_kb` with no store back.
+
+The missing half is a one-time activation at boot:
+
+```c
+void keyboard_post_init_user(void) {
+    layer_on(_FUNCTION);   /* safe here: NOT inside layer_state_set_user() */
+}
+```
+
+`verify_coverage.py` now asserts this call exists. The earlier version of that
+script could not have caught it: it composed the base layers with `_FUNCTION`
+and checked for holes, which assumes the very composition it was meant to be
+proving.
+
 ## Bug inventory (commit 3)
 
 Build-blocking:
@@ -218,7 +249,22 @@ building in CI for exactly this reason.
 - **Drop:** combos, dynamic macros, text-editing macros.
 - **Mode indication is a first-class requirement**, not a nicety. Two signals:
   underglow colour for *where you are*, a per-layout tune for *something just
-  changed*.
+  changed*. The seven hues are spaced evenly around the wheel (36-37 apart); an
+  earlier set had three pairs only 21 apart, too close to read at a glance.
+
+## Tap/hold timing differs between the two keymaps — on purpose
+
+`dooroflife` carries no `TAPPING_TERM`, exactly like the 2021 Configurator
+export it reproduces, so QMK's defaults apply: `TAPPING_TERM` 200 and
+`QUICK_TAP_TERM` 200. `dooroflife_v2` sets `TAPPING_TERM 180`,
+`HOLD_ON_OTHER_KEY_PRESS` and `QUICK_TAP_TERM 0`, carried from the 2021
+*rewrite*.
+
+Both are faithful to their sources, but it means **v2 will feel different on
+the thumb and pinky keys even where the layout is identical** — holds trigger
+20 ms sooner, and tap-then-hold holds instead of repeating the tap. That is an
+intended change, not a porting error. If v2's dual-role keys feel wrong, adjust
+`dooroflife_v2/config.h` rather than suspecting the layout.
 
 ## What is on this branch
 
@@ -259,7 +305,8 @@ Three ways into the bootloader, in order of preference:
 
 1. **Bootmagic** — hold the top-left key (Esc position) while plugging the board
    in. Enabled at the keyboard level, so it works regardless of the keymap.
-2. **`QK_BOOT`** — hold right Ctrl, then the top-right key.
+2. **`QK_BOOT`** — hold right Ctrl, then the top-right key. `EE_CLR` sits in
+   the opposite corner (bottom left) so a near miss cannot wipe your settings.
 3. **The physical reset button.** A pinhole labelled `reset` on the back plate,
    near the top right — reachable with a paperclip or SIM tool, no disassembly.
    This depends on no firmware at all, which is the point.

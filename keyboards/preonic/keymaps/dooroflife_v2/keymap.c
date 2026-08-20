@@ -23,22 +23,27 @@
  * Two independent signals, because they answer different questions:
  *
  *   Underglow  = what mode am I in *right now*. At rest the colour shows the
- *                base layer (cyan Colemak / amber QWERTY); while a layer key
+ *                base layer (teal Colemak / amber QWERTY); while a layer key
  *                is held it shows that layer.
  *   Sound      = something just changed. Switching base layer plays a
  *                distinct tune per layout (DEFAULT_LAYER_SONGS in config.h).
  *
  * The underglow deliberately yields to your own controls: if you switch the
  * underglow off, or pick an animation instead of a static colour, the layer
- * colouring stops touching it until you set it back to static.
+ * colouring stops touching it until you set it back to static — and it keeps
+ * whatever saturation and brightness you have set.
  *
- * ── Why layer_on() is nowhere in this file ─────────────────────────────────
+ * ── Keeping _FUNCTION on takes two halves, and both are needed ─────────────
  *
- * The 2021 version kept _FUNCTION on by calling layer_on() from inside
- * layer_state_set_user(). QMK assigns that hook's *return value* to
- * layer_state afterwards, so the inner call was silently undone — leaving a
- * keyboard where letters worked and nothing else did. The fix is to fold the
- * layer into the state we return. See layer_state_set_user() below.
+ * 1. keyboard_post_init_user() calls layer_on(_FUNCTION) once at boot.
+ *    Without it the layer is simply off when the board enumerates, only the
+ *    alphas type, and no layer key works — see the comment there.
+ * 2. layer_state_set_user() ORs _FUNCTION back into the state it returns, so
+ *    it survives every later layer change.
+ *
+ * What must never come back is the 2021 form: calling layer_on() from *inside*
+ * layer_state_set_user(). QMK assigns that hook's return value to layer_state
+ * afterwards, so an inner call is silently undone.
  */
 
 #include QMK_KEYBOARD_H
@@ -69,16 +74,18 @@ enum keycodes {
 #define ALT_DEL LALT_T(KC_DEL)
 #define ALT_APP RALT_T(KC_APP)
 
-/* Underglow hues, 0-255. Chosen so neighbouring modes never look alike, and
- * so the two base layouts sit on opposite sides of the wheel — you should be
- * able to tell Colemak from QWERTY out of the corner of your eye. */
-#define HUE_COLEMAK  128  /* cyan    */
-#define HUE_QWERTY    21  /* amber   */
-#define HUE_FKEYS    234  /* pink    */
-#define HUE_NAV      191  /* violet  */
-#define HUE_MOUSE     85  /* green   */
+/* Underglow hues, 0-255, spaced evenly around the wheel (36-37 apart, ~50
+ * degrees). Seven modes on a 256-step wheel leaves no room to cluster: an
+ * earlier set had three pairs only 21 apart (red/amber, blue/violet,
+ * pink/red), which is not enough to read at a glance — and telling the mode
+ * apart is the whole point of colouring it. */
 #define HUE_MEDIA      0  /* red     */
-#define HUE_SETTINGS 170  /* blue    */
+#define HUE_QWERTY    37  /* amber   */
+#define HUE_MOUSE     73  /* green   */
+#define HUE_COLEMAK  110  /* teal    */
+#define HUE_SETTINGS 146  /* blue    */
+#define HUE_NAV      183  /* violet  */
+#define HUE_FKEYS    219  /* magenta */
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
@@ -145,13 +152,15 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     /* Settings — reached by holding right Ctrl, exactly where it has been
      * since 2021. Layout switching sits on the home row under your strongest
      * fingers, because it is the one thing here you reach for mid-session.
-     * QK_BOOT and EE_CLR are tucked into far corners on purpose. */
+     * QK_BOOT (top right) and EE_CLR (bottom left) sit in opposite corners on
+     * purpose: they were adjacent, and missing the bootloader by one key to
+     * the left wiped the EEPROM instead, taking the saved layout with it. */
     [_SETTINGS] = LAYOUT_preonic_1x2uC(
-        NK_ON,   XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, EE_CLR,  QK_BOOT,
+        NK_ON,   XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, QK_BOOT,
         UG_TOGG, XXXXXXX, UG_SATU, XXXXXXX, UG_VALU, UG_SPDU, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,
         XXXXXXX, BASE_CM, BASE_TG, BASE_QW, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,
         XXXXXXX, UG_PREV, UG_SATD, UG_NEXT, UG_VALD, UG_SPDD, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,
-        XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,     AU_TOGG,      XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, _______),
+        EE_CLR,  XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,     AU_TOGG,      XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, _______),
 };
 
 /* ── underglow ─────────────────────────────────────────────────────────────
@@ -179,8 +188,10 @@ static void apply_underglow(uint8_t top, layer_state_t defaults) {
             hue = (defaults & (1UL << _QWERTY)) ? HUE_QWERTY : HUE_COLEMAK;
             break;
     }
-    /* Keep the owner's brightness — UG_VALU/UG_VALD stay meaningful. */
-    rgblight_sethsv_noeeprom(hue, 255, rgblight_get_val());
+    /* Keep the owner's saturation and brightness, so UG_SATU/UG_SATD and
+     * UG_VALU/UG_VALD all stay meaningful. Hard-coding saturation here undid
+     * every UG_SATU/UG_SATD press on the next layer change. */
+    rgblight_sethsv_noeeprom(hue, rgblight_get_sat(), rgblight_get_val());
 }
 #else
 static void apply_underglow(uint8_t top, layer_state_t defaults) {
@@ -208,9 +219,44 @@ layer_state_t default_layer_state_set_user(layer_state_t state) {
 }
 
 void keyboard_post_init_user(void) {
-    /* layer_state_set_user() has not run yet at boot; light up correctly. */
-    apply_underglow(get_highest_layer(layer_state | (1UL << _FUNCTION)), default_layer_state);
+    /* Switch _FUNCTION on for real, once, at boot.
+     *
+     * Folding it into layer_state_set_user()'s return value is NOT enough on
+     * its own. quantum_init() calls layer_state_set_kb(layer_state) and throws
+     * the result away (quantum/keyboard.c), and layer_state is only ever
+     * written inside layer_state_set() (quantum/action_layer.c) — which
+     * nothing calls before the first key press. layer_state starts at 0 in
+     * .bss, so without this line _FUNCTION is off when the board enumerates:
+     * alphas type, and nothing else does. There is no recovery by typing,
+     * because every layer key lives on _FUNCTION too.
+     *
+     * layer_on() is safe *here* precisely because this is not inside
+     * layer_state_set_user() — it runs the hook and stores the result, which
+     * also paints the underglow on the way through. Calling it from inside
+     * that hook is the 2021 bug this keymap exists to fix. */
+    layer_on(_FUNCTION);
 }
+
+/* ── encoder ───────────────────────────────────────────────────────────────
+ *
+ * The board's own encoder_update_kb() (keyboards/preonic/preonic.c) picks
+ * volume whenever `get_highest_layer(layer_state) > 0`, meaning "some layer is
+ * held". With _FUNCTION permanently on that test is always true, so the
+ * encoder would do volume forever and the stock page-scroll would be
+ * unreachable. Restore the intent by comparing against _FUNCTION instead.
+ *
+ * Returning false tells encoder_update_kb() we have handled it.
+ */
+#ifdef ENCODER_ENABLE
+bool encoder_update_user(uint8_t index, bool clockwise) {
+    if (get_highest_layer(layer_state) > _FUNCTION) {
+        tap_code_delay(clockwise ? KC_VOLU : KC_VOLD, 10);
+    } else {
+        tap_code(clockwise ? KC_PGDN : KC_PGUP);
+    }
+    return false;
+}
+#endif
 
 /* ── base layout switching ─────────────────────────────────────────────────
  *
